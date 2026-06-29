@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>발표 템플릿 — 제목</title>
+<!--
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  재사용 발표 템플릿 (16:9, 1280×720 고정 스테이지 + 자동 스케일)         │
+  │  · ←/→ · Space · PageUp/Down 이동 / Home·End 처음·끝 / F 전체화면        │
+  │  · 화면 좌(22%)/우 클릭으로도 이동 (버튼·링크·figure·iframe 영역 제외)   │
+  │                                                                        │
+  │  ▣ 핵심 원칙                                                            │
+  │    1) 본문(.grow)은 헤더 구분선 바로 아래(상단)에 붙는다.                │
+  │    2) 박스는 내용만큼만 — 남는 세로 공간은 아래쪽 여백으로 둔다.           │
+  │    3) 가운데/고른분배가 필요할 때만 opt-in: .center / .grow.spread      │
+  │                                                                        │
+  │  자세한 사용법·컴포넌트 목록은 같은 폴더의 README.md 참고.               │
+  │  새 슬라이드는 아래 <section class="slide"> 블록을 복사해서 수정.         │
+  │  figures/ 의 예시 그림·simulations/ 의 예시 시뮬은 자기 자료로 교체.     │
+  └──────────────────────────────────────────────────────────────────────┘
+-->
+<style>
+  /* ════════ 색·글꼴 토큰 — 여기만 바꾸면 전체 반영 ════════ */
+  :root{
+    --navy:#1b2a4a; --navy2:#28406b;
+    --teal:#0b78bd; --teal-l:#e7f1fa;        /* 포인트색(파랑) / 옅은 배경 */
+    --accent:#d97706;                         /* 대비 강조색(주황) */
+    --ink:#1d2330; --muted:#6b7385; --line:#e3e7ee;
+    --bg:#ffffff; --card:#f7f9fc; --amber:#b8860b; --green:#1e7a4d;
+    --serif:"Iowan Old Style","Apple Garamond",Georgia,"Noto Serif KR",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR","Apple SD Gothic Neo",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--sans);color:var(--ink);background:#0b1220;overflow:hidden}
+
+  /* ════════ 고정 스테이지 (1280×720) + 자동 스케일 ════════ */
+  #stage{position:fixed;top:50%;left:50%;width:1280px;height:720px;
+    transform:translate(-50%,-50%) scale(var(--scale,1));transform-origin:center center;
+    background:var(--bg);box-shadow:0 20px 70px rgba(0,0,0,.5);overflow:hidden}
+
+  .slide{position:absolute;inset:0;padding:42px 60px 34px;display:none;
+    flex-direction:column;animation:fade .35s ease;overflow:hidden}
+  .slide.active{display:flex}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* ════════ 타이포 ════════ */
+  h1{font-family:var(--serif);font-size:46px;line-height:1.15;color:var(--navy);font-weight:700}
+  h2{font-family:var(--serif);font-size:31px;color:var(--navy);font-weight:700;margin-bottom:4px}
+  .kicker{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);font-weight:700;margin-bottom:10px}
+  /* 섹션 트래커: kicker 자리에 전체 섹션을 가로로 나열, 현재 섹션만 강조 */
+  .secnav{display:flex;flex-wrap:wrap;gap:5px 18px;font-size:13px;letter-spacing:.03em;margin-bottom:9px}
+  .secnav span{color:var(--muted);font-weight:600;white-space:nowrap}
+  .secnav span.cur{color:var(--teal);font-weight:700;border-bottom:2px solid var(--teal);padding-bottom:2px}
+  .sub{color:var(--muted);font-size:18px;margin-top:4px}
+  p,li{font-size:19px;line-height:1.5}
+  .small{font-size:16px} .tiny{font-size:12.5px;color:var(--muted)}
+  b,strong{color:var(--navy)}
+  em{color:var(--accent);font-style:normal;font-weight:600}
+
+  /* ════════ 헤더 (.head = kicker/secnav + h2 + 우측 로고) ════════ */
+  .head{border-bottom:2px solid var(--line);padding-bottom:10px;margin-bottom:14px;
+    display:flex;align-items:baseline;justify-content:space-between}
+  .head .lab-logo{height:56px;width:auto;align-self:center;flex:0 0 auto}  /* 우측 연구실/학교/회사 로고 */
+
+  /* ════════ 레이아웃 골격 ════════ */
+  .grow{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-start}  /* 본문: 헤더선 아래(상단)에 붙음 — 남는 공간은 아래 여백 */
+  .row{display:flex;gap:24px;flex-direction:row}   /* 가로 분할 (나란한 칸은 align-items:stretch 로 서로 높이 맞춤) */
+  .col{flex:1;min-width:0}                          /* 등분 열 */
+
+  /* ── opt-in 헬퍼: 기본은 '상단 + 내용만큼'. 아래는 필요할 때만 ── */
+  .grow.spread{justify-content:space-between}        /* 독립 블록을 위→아래로 고르게 분배(목차 등) */
+  .grow-row{flex:0 0 auto;min-height:0}              /* 행을 늘리지 않고 내용만큼만 (그룹 묶음용) */
+  .col.fillcards{display:flex;flex-direction:column;gap:14px}
+  .col.fillcards>.card{flex:0 0 auto}               /* 열 안 카드도 내용만큼만 */
+  .center{justify-content:center;align-items:center;text-align:center}
+  .card.center{display:flex;flex-direction:column;justify-content:center;align-items:center}
+  ul{padding-left:22px} li{margin:7px 0}
+  li::marker{color:var(--teal)}
+
+  /* ════════ 글 박스 (.card) — 조립식 컴포넌트 ════════ */
+  /* 기본은 '테두리·배경 없음'(내용 전용). 변형을 더해 조합한다. 예) class="card dashed sm"
+     · 채움 :  (기본 없음) / gray(회색) / teal(파랑) / accent(주황)
+     · 테두리:  (기본 없음) / dashed(점선·배경없음) / gray·teal·accent(실선)
+     · 글씨 :  sm / (기본 18px) / lg                                     */
+  .card{background:none;border:none;border-radius:14px;padding:2px;font-size:18px}
+  .card h3{font-size:1.06em;color:var(--navy);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  /* 채움/테두리 변형 — 배경·테두리와 함께 안쪽 여백을 준다 */
+  .card.gray{background:var(--card);border:1.5px solid var(--line);padding:16px 20px}     /* 회색 채움 + 실선 */
+  .card.teal{background:var(--teal-l);border:1.5px solid #bcd9f2;padding:16px 20px}       /* 파란 강조 */
+  .card.accent{background:#fdf3e3;border:1.5px solid #f3d9a8;padding:16px 20px}           /* 주황 강조 */
+  .card.dashed{background:none;border:1.5px dashed #c3ccd8;padding:16px 20px}             /* 점선·배경없음 (그림 해설에 잘 어울림) */
+  /* 글씨 크기 변형 (안쪽 .outline·문단이 따라 커지고 작아짐) */
+  .card.sm{font-size:16px}
+  .card.lg{font-size:20px}
+  /* 글 박스 내부 유틸 */
+  .card .ctx{color:var(--navy);font-weight:700;margin-bottom:5px}                 /* 맥락 한 줄(어떤 상황의 그림/표인지) */
+  .card .key{color:var(--accent);font-weight:700;margin-top:6px;line-height:1.4}  /* 결론 한 줄(➡️) */
+
+  /* 표 */
+  table{width:100%;border-collapse:collapse;font-size:16px}
+  th,td{padding:8px 13px;text-align:left;border-bottom:1px solid var(--line)}
+  th{background:var(--navy);color:#fff;font-weight:600}
+  tr:nth-child(even) td{background:var(--card)}
+  td.c,th.c{text-align:center}                       /* 가운데 정렬 셀 */
+  .mark{font-weight:800;line-height:1;display:inline-block}
+  .mark.y{color:var(--green);font-size:21px}         /* ✓ */
+  .mark.n{color:#bcc2cc;font-size:18px}              /* ✗ */
+
+  /* 인라인 수식 변수 (본문 중 r, θ, w_ij 등) */
+  .var{font-family:var(--serif);font-style:italic} sub{font-size:.7em} sup{font-size:.7em}
+
+  /* 그림 / 수식 이미지 / 시뮬 임베드 */
+  figure{margin:0}
+  img.figure{width:100%;border:1px solid var(--line);border-radius:8px;background:#fff;
+    box-shadow:0 2px 10px rgba(0,0,0,.05);display:block;object-fit:contain}
+  img.eqimg{display:block;width:auto;max-width:100%;margin:0 auto;border:1px solid var(--line);
+    border-radius:8px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.05)}  /* 수식 스크린샷: 원본 비율 유지·가운데 */
+  figcaption{font-size:12px;color:var(--muted);margin-top:4px;text-align:center}
+  iframe.sim{width:100%;height:100%;border:1px solid var(--line);border-radius:10px;background:#0a0d12;display:block}
+
+  /* ════════ 푸터 / 진행바 ════════ */
+  #bar{position:absolute;bottom:0;left:0;height:5px;background:var(--teal);transition:width .3s}
+  .foot{position:absolute;bottom:12px;right:22px;font-size:12.5px;color:var(--muted)}
+  .foot .pno{font-weight:700;color:var(--navy)}
+  .brandfoot{position:absolute;bottom:12px;left:22px;font-size:11.5px;color:var(--muted);letter-spacing:.05em}
+
+  /* ════════ 표지 ════════ */
+  .title-wrap{height:100%;display:flex;flex-direction:column;justify-content:center;position:relative}
+  .title-wrap .venue{display:inline-block;font-size:14px;font-weight:700;color:var(--teal);
+    letter-spacing:.15em;text-transform:uppercase;margin-bottom:18px}
+  .title-wrap h1{font-size:50px;margin-bottom:10px}
+  .title-wrap .presenter{margin-top:30px;padding-top:20px;border-top:2px solid var(--line);font-size:18px;color:var(--ink)}
+
+  /* ════════ 목차 ════════ */
+  .toc{display:grid;grid-template-columns:1fr;gap:0 40px;margin-top:4px}
+  .toc .ti{display:flex;gap:14px;align-items:center;padding:20px 0;border-bottom:1px solid var(--line)}
+  .toc .ti .pn{line-height:1}
+  .toc .ti .pn{font-family:var(--serif);font-size:23px;color:var(--teal);font-weight:700;min-width:32px}
+  .toc .ti .tt{font-size:18px}
+
+  /* ════════ 개요 들여쓰기 (글 박스 안 내용) — 글씨크기는 .card 가 정함 ════════ */
+  /* 1단계는 글머리표 없음 / 2단계 점 / 3단계 대시. ul 을 더 중첩하면 계속 들여쓰기 */
+  /* 모든 크기는 em(글 박스 글씨 기준) → .card.sm / .card.lg 에 따라 같이 조절됨 */
+  .outline{list-style:none;padding-left:0;margin:0}
+  .outline>li{font-size:1em;line-height:1.45;margin:9px 0}        /* 1단계: 글머리표 없음 */
+  .outline>li:first-child{margin-top:0}
+  .outline ul{padding-left:22px;margin:5px 0}
+  .outline ul li{font-size:.9em;line-height:1.45;margin:5px 0;list-style:disc}   /* 2단계: 점 */
+  .outline ul li::marker{color:var(--teal)}
+  .outline ul ul li{font-size:.95em;color:var(--muted);list-style:"–  "}         /* 3단계: 대시 */
+
+  /* ════════ 우상단 버튼 (PDF 출력 · 전체화면) ════════ */
+  #fsbtn,#pdfbtn{position:fixed;top:14px;z-index:20;background:rgba(255,255,255,.14);color:#cdd7ee;
+    border:1px solid rgba(255,255,255,.2);border-radius:8px;font-size:18px;padding:6px 11px;cursor:pointer}
+  #fsbtn{right:16px}
+  #pdfbtn{right:60px}
+  #fsbtn:hover,#pdfbtn:hover{background:rgba(255,255,255,.28);color:#fff}
+
+  /* ════════ PDF / 인쇄 — 슬라이드마다 16:9 한 페이지 ════════ */
+  /* PDF 버튼(또는 Ctrl/⌘+P) → '대상: PDF로 저장', 여백 '없음' 으로 저장하면 한 장당 한 페이지(1280×720, 16:9). */
+  @page{size:1280px 720px;margin:0}
+  @media print{
+    html,body{height:auto;overflow:visible;background:#fff;
+      -webkit-print-color-adjust:exact;print-color-adjust:exact}   /* 배경색(헤더·강조박스)까지 인쇄 */
+    #fsbtn,#pdfbtn,#bar{display:none !important}                    /* 화면 전용 UI 숨김 */
+    #stage{position:static;transform:none;left:auto;top:auto;width:1280px;height:auto;box-shadow:none;border-radius:0}
+    .slide{position:relative;inset:auto;display:flex !important;   /* 모든 슬라이드를 펼쳐서 */
+      width:1280px;height:720px;overflow:hidden;animation:none;
+      break-after:page;page-break-after:always;break-inside:avoid} /* 한 장당 한 페이지 */
+    .slide:last-child{break-after:auto;page-break-after:auto}
+    .foot{position:fixed}                                          /* 푸터(제목)는 매 페이지 반복 */
+    .foot .pno{display:none}                                       /* 페이지번호는 인쇄 대화상자의 '머리글/바닥글'로 */
+    *{box-shadow:none !important}                                  /* 크롬 PDF는 box-shadow를 거칠게 래스터화 → 인쇄 시 그림자 제거 */
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- ════════ 1. 제목 슬라이드 ════════ -->
+  <section class="slide active">
+    <div class="title-wrap">
+      <!-- venue = 이 발표가 무엇을 위한 자리인지: 세미나 발표 / 논문 발표 / 학위 디펜스 / 과제·프로젝트 발표 등 -->
+      <span class="venue">세미나 발표</span>
+      <h1>발표 제목 <em>강조 부분</em></h1>
+      <p class="sub">한 줄 부제목을 여기에</p>
+      <div class="presenter"><b>지능형데이터처리연구실 (IDPLAB)</b> &nbsp;|&nbsp; 발표자 <b>이수행</b> &nbsp;|&nbsp; YYYY.MM.DD</div>
+    </div>
+  </section>
+
+  <!-- ════════ 2. 목차 (grow spread = 목록 위 / 강조 블록 아래) ════════ -->
+  <section class="slide">
+    <div class="head"><div><div class="kicker">Overview</div><h2>목차</h2></div><img class="lab-logo" src="figures/lab-logo.png" alt="연구실 로고"></div>
+    <div class="grow spread">
+      <div class="toc">
+        <div class="ti"><div class="pn">1</div><div><div class="tt"><b>섹션 1</b></div></div></div>
+        <div class="ti"><div class="pn">2</div><div><div class="tt"><b>섹션 2</b></div></div></div>
+        <div class="ti"><div class="pn">3</div><div><div class="tt"><b>섹션 3</b></div></div></div>
+        <div class="ti"><div class="pn">4</div><div><div class="tt"><b>섹션 4</b></div></div></div>
+        <div class="ti"><div class="pn">5</div><div><div class="tt"><b>섹션 5</b></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ 3. 내용 전용 (기본 글 박스 = 테두리 없음) ════════ -->
+  <!-- class="card" 기본은 테두리·배경 없이 내용만. <ul> 더 중첩하면 더 깊이 들여쓰기 -->
+  <section class="slide">
+    <div class="head"><div><div class="secnav"><span class="cur">섹션 1</span><span>섹션 2</span><span>섹션 3</span><span>섹션 4</span><span>섹션 5</span></div><h2>기본 글 박스</h2></div><img class="lab-logo" src="figures/lab-logo.png" alt="연구실 로고"></div>
+    <div class="grow">
+      <div class="card">
+        <ul class="outline">
+          <li>내용 1
+            <ul>
+              <li>다람쥐 헌 쳇바퀴에 타고파</li>
+              <li>The quick brown fox jumps over the lazy dog
+                <ul>
+                  <li>AaBbCcDd 0123456789</li>
+                  <li>다람쥐 헌 쳇바퀴에 타고파</li>
+                </ul></li>
+            </ul></li>
+          <li>내용 2
+            <ul>
+              <li>다람쥐 헌 쳇바퀴에 타고파</li>
+              <ul><li>The quick brown fox jumps over the lazy dog</li></ul>
+            </ul></li>
+          <li>수식 예시
+            <ul>
+              <li><span class="var">σ</span>(<span class="var">z</span>) = 1 / (1 + <span class="var">e</span><sup>−<span class="var">z</span></sup>)
+                <ul>
+                  <li><span class="var">ŷ</span> = <span class="var">w</span><sub>1</sub><span class="var">x</span><sub>1</sub> + <span class="var">w</span><sub>2</sub><span class="var">x</span><sub>2</sub> + <span class="var">b</span></li>
+                </ul></li>
+            </ul></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ 4. 글 박스 변형 한눈에 (옵션 카탈로그) ════════ -->
+  <!-- 같은 .card 에 class 만 더해 배경·테두리·글씨를 바꾼다. 필요한 조합을 골라 쓰면 됨 -->
+  <section class="slide">
+    <div class="head"><div><div class="secnav"><span class="cur">섹션 1</span><span>섹션 2</span><span>섹션 3</span><span>섹션 4</span><span>섹션 5</span></div><h2>글 박스 변형 (골라서 조합)</h2></div><img class="lab-logo" src="figures/lab-logo.png" alt="연구실 로고"></div>
+    <div class="grow">
+      <div class="row grow-row">
+        <div class="col card"><ul class="outline"><li>기본 글 박스 (card)</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+        <div class="col card dashed"><ul class="outline"><li>점선 글 박스 (card dashed)</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+      </div>
+      <div class="row grow-row" style="margin-top:14px">
+        <div class="col card gray"><ul class="outline"><li>회색 (card gray)</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+        <div class="col card teal"><ul class="outline"><li>파랑 (card teal)</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+        <div class="col card accent"><ul class="outline"><li>주황 (card accent)</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+      </div>
+      <div class="row grow-row" style="margin-top:14px">
+        <div class="col card gray sm"><ul class="outline"><li>작은 글씨 (card sm)</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+        <div class="col card gray lg"><ul class="outline"><li>큰 글씨 (card lg)</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ 5. 글 박스 배치 (풀폭 / 2단 / 3단) ════════ -->
+  <!-- 같은 글 박스를 행(.row)·열(.col)로 배치한다. 1개=풀폭 / 2개=2단 / 3개=3단 -->
+  <section class="slide">
+    <div class="head"><div><div class="secnav"><span>섹션 1</span><span class="cur">섹션 2</span><span>섹션 3</span><span>섹션 4</span><span>섹션 5</span></div><h2>글 박스 배치 (풀폭 · 2단 · 3단)</h2></div><img class="lab-logo" src="figures/lab-logo.png" alt="연구실 로고"></div>
+    <div class="grow">
+      <div class="card gray"><ul class="outline"><li>풀폭 1개 (1단)</li>
+        <li>가나다라마 ABCabc 0123
+          <ul><li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+      <div class="row grow-row" style="margin-top:14px">
+        <div class="col card gray"><ul class="outline"><li>2단 — 왼쪽</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+        <div class="col card gray"><ul class="outline"><li>2단 — 오른쪽</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+      </div>
+      <div class="row grow-row" style="margin-top:14px">
+        <div class="col card gray"><ul class="outline"><li>3단 — 1</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+        <div class="col card gray"><ul class="outline"><li>3단 — 2</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+        <div class="col card gray"><ul class="outline"><li>3단 — 3</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ 6. 그림 박스 (좌 그림 / 우 점선 해설박스) ════════ -->
+  <!-- 점선 박스(dashed)는 그림 해설에 잘 어울린다 -->
+  <section class="slide">
+    <div class="head"><div><div class="secnav"><span>섹션 1</span><span class="cur">섹션 2</span><span>섹션 3</span><span>섹션 4</span><span>섹션 5</span></div><h2>그림 박스</h2></div><img class="lab-logo" src="figures/lab-logo.png" alt="연구실 로고"></div>
+    <div class="grow">
+      <div class="row grow-row">
+        <div class="col"><figure><img class="figure" src="figures/example-figure-a.png" alt="그림" style="max-height:380px">
+          <figcaption>Fig.1 — 그림 캡션 (예시 그림은 figures/ 의 파일로 교체)</figcaption></figure></div>
+        <div class="col card dashed"><ul class="outline"><li>그림 해설</li>
+          <li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123
+              <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════ 7. 가로로 긴 그림 박스 + 하단 글 박스 ════════ -->
+  <section class="slide">
+    <div class="head"><div><div class="secnav"><span>섹션 1</span><span>섹션 2</span><span class="cur">섹션 3</span><span>섹션 4</span><span>섹션 5</span></div><h2>가로로 긴 그림 박스</h2></div><img class="lab-logo" src="figures/lab-logo.png" alt="연구실 로고"></div>
+    <div class="grow">
+      <figure style="width:100%"><img class="figure" src="figures/example-diagram.png" alt="구조도" style="width:100%;max-height:300px">
+        <figcaption>Fig. — 전체 구조도</figcaption></figure>
+      <div class="card dashed" style="margin-top:14px"><ul class="outline"><li>그림 해설</li>
+        <li>가나다라마 ABCabc 0123
+          <ul><li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+    </div>
+  </section>
+
+  <!-- ════════ 8. 표 + 가로로 긴 글 박스 1개 ════════ -->
+  <section class="slide">
+    <div class="head"><div><div class="secnav"><span>섹션 1</span><span>섹션 2</span><span class="cur">섹션 3</span><span>섹션 4</span><span>섹션 5</span></div><h2>표 + 글 박스</h2></div><img class="lab-logo" src="figures/lab-logo.png" alt="연구실 로고"></div>
+    <div class="grow">
+      <table>
+        <tr><th>항목</th><th class="c">옵션 A</th><th class="c">옵션 B</th><th class="c">옵션 C</th></tr>
+        <tr><td>특성 1</td><td class="c"><span class="mark y">✓</span></td><td class="c"><span class="mark y">✓</span></td><td class="c"><span class="mark n">✗</span></td></tr>
+        <tr><td>특성 2</td><td class="c"><span class="mark y">✓</span></td><td class="c"><span class="mark n">✗</span></td><td class="c"><span class="mark n">✗</span></td></tr>
+        <tr><td>특성 3</td><td class="c"><span class="mark y">✓</span></td><td class="c"><span class="mark y">✓</span></td><td class="c"><span class="mark y">✓</span></td></tr>
+        <tr><td><b>특성 4</b></td><td class="c"><span class="mark y">✓</span></td><td class="c"><span class="mark y">✓</span></td><td class="c"><span class="mark y">✓</span></td></tr>
+      </table>
+      <div class="card dashed" style="margin-top:16px"><ul class="outline"><li>표 해설</li>
+        <li>가나다라마 ABCabc 0123
+          <ul><li>가나다라마 ABCabc 0123
+            <ul><li>가나다라마 ABCabc 0123</li></ul></li></ul></li></ul></div>
+    </div>
+  </section>
+
+  <!-- ════════ 9. 인터랙티브 시뮬 (3D) — 맨 뒤 ════════ -->
+  <!-- 수식은 별도 슬라이드 없이 글 박스(.card) 안에 <img class="eqimg"> 를 넣는 변형 케이스로 쓴다 -->
+  <section class="slide">
+    <div class="head"><div><div class="secnav"><span>섹션 1</span><span>섹션 2</span><span>섹션 3</span><span class="cur">섹션 4</span><span>섹션 5</span></div><h2>인터랙티브 시뮬</h2></div><img class="lab-logo" src="figures/lab-logo.png" alt="연구실 로고"></div>
+    <div class="grow">
+      <div style="flex:1;min-height:0"><iframe class="sim" src="simulations/example-3d-sim.html" title="3D sim"></iframe></div>
+      <p class="tiny" style="margin-top:6px">🖱️ <b>드래그로 시점 회전</b> · 슬라이더로 방향 φ·주파수 ω·보폭 μ·몸높이 h 조절. (예시 시뮬은 simulations/ 의 파일로 교체)</p>
+    </div>
+  </section>
+
+  <!-- ════════ 10. Q&A / 감사합니다 ════════ -->
+  <section class="slide">
+    <div class="head"><div><div class="kicker">Thank you</div><h2>Q&amp;A</h2></div><img class="lab-logo" src="figures/lab-logo.png" alt="연구실 로고"></div>
+    <div class="grow center">
+      <p style="font-family:var(--serif);font-size:48px;color:var(--navy);font-weight:700">감사합니다</p>
+    </div>
+  </section>
+
+  <div id="bar"></div>
+  <div class="foot">발표 제목 &nbsp; <span class="pno"><span id="cur">1</span> / <span id="tot">10</span></span></div>
+  <div class="brandfoot"><!-- (선택) 좌하단 브랜딩: 헤더 로고로 충분해 비워둠. 필요하면 소속/과목 등 입력 --></div>
+</div>
+
+<button id="pdfbtn" title="PDF로 저장 (인쇄)">🖨</button>
+<button id="fsbtn" title="전체화면 (F)">⛶</button>
+
+<script>
+/* ---------- 내비게이션 (수정 불필요) ---------- */
+const slides=[...document.querySelectorAll('.slide')];
+const tot=slides.length; let i=0;
+document.getElementById('tot').textContent=tot;   /* 총 장수 자동 계산 */
+function show(n){
+  i=Math.max(0,Math.min(tot-1,n));
+  slides.forEach((s,k)=>s.classList.toggle('active',k===i));
+  document.getElementById('cur').textContent=i+1;
+  document.getElementById('bar').style.width=((i+1)/tot*100)+'%';
+}
+function fit(){const s=Math.min(window.innerWidth/1280,window.innerHeight/720);
+  document.getElementById('stage').style.setProperty('--scale',s);}
+addEventListener('resize',fit); fit(); show(0);
+
+function toggleFS(){
+  const el=document.documentElement;
+  const fsEl=document.fullscreenElement||document.webkitFullscreenElement;
+  if(!fsEl){(el.requestFullscreen||el.webkitRequestFullscreen||el.webkitRequestFullScreen||el.mozRequestFullScreen).call(el);}
+  else{(document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen).call(document);}
+}
+addEventListener('keydown',e=>{
+  if(['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){show(i+1);e.preventDefault();}
+  else if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){show(i-1);e.preventDefault();}
+  else if(e.key==='Home')show(0);
+  else if(e.key==='End')show(tot-1);
+  else if(e.key==='f'||e.key==='F')toggleFS();
+});
+addEventListener('click',e=>{
+  if(e.target.closest('button,a,figure,iframe')) return;   /* 인터랙티브 영역에선 페이지 이동 안 함 */
+  const x=e.clientX/window.innerWidth;
+  if(x<0.30) show(i-1); else if(x>0.70) show(i+1);   /* 가운데 40%는 죽은 영역(이동 안 함) */
+});
+document.getElementById('fsbtn').addEventListener('click',e=>{e.stopPropagation();toggleFS();});
+document.getElementById('pdfbtn').addEventListener('click',e=>{e.stopPropagation();window.print();});
+</script>
+</body>
+</html>

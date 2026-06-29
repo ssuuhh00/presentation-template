@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPG-RL 3D 시뮬 — 방향 변수 φ</title>
+<style>
+  :root{
+    --bg:#0e1117; --panel:#161b22; --line:#30363d; --txt:#e6edf3; --sub:#9da7b3;
+    --accent:#58a6ff; --fr:#ff7b72; --fl:#79c0ff; --hr:#56d364; --hl:#e3b341;
+    --knob:#ffd27f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:"Segoe UI","Malgun Gothic",sans-serif}
+  header{padding:14px 20px;border-bottom:1px solid var(--line)}
+  header h1{margin:0;font-size:18px}
+  header p{margin:4px 0 0;color:var(--sub);font-size:13px}
+  .wrap{display:flex;gap:16px;padding:16px;flex-wrap:wrap}
+  .stage{flex:1 1 560px;min-width:340px}
+  canvas{background:#0a0d12;border:1px solid var(--line);border-radius:10px;width:100%;display:block;cursor:grab}
+  canvas:active{cursor:grabbing}
+  .panel{flex:0 0 300px;align-self:flex-start;background:var(--panel);border:1px solid var(--line);
+         border-radius:10px;padding:16px}
+  .panel h2{font-size:14px;margin:0 0 10px;color:var(--accent)}
+  .row{margin-bottom:13px}
+  .row label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+  .row label .val{color:var(--accent);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  button{font:inherit;color:var(--txt);background:#21262d;border:1px solid var(--line);
+         border-radius:7px;padding:7px 10px;cursor:pointer}
+  .btns{display:flex;gap:8px;margin-bottom:14px}.btns button{flex:1}
+  button:hover{border-color:var(--accent)}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--sub);margin-top:8px;flex-wrap:wrap}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .tip{font-size:12px;color:var(--sub);line-height:1.6;margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+  b.k{color:var(--knob)}
+  /* 슬라이드 iframe에 임베드될 때: 헤더 숨기고, 캔버스를 iframe 크기에 맞춰 비율 유지하며 꽉 채움(내부 스크롤 없음) */
+  .embed header{display:none}
+  .embed{height:100%}
+  .embed body{height:100%;overflow:hidden}
+  .embed .wrap{height:100%;padding:12px 16px;gap:14px;flex-wrap:nowrap;align-items:stretch}
+  .embed .stage{display:flex;flex-direction:column;min-width:0;min-height:0}
+  .embed .stage canvas{flex:1 1 0;min-height:0;width:100%;height:auto;margin:0}
+  .embed .panel{flex:0 0 280px;padding:13px;overflow:auto}
+  .embed .row{margin-bottom:9px}
+  .embed .panel h2{margin-bottom:8px}
+  .embed .btns{margin-bottom:10px}
+</style>
+</head>
+<body>
+<script>if(window.self!==window.top)document.documentElement.classList.add('embed');</script>
+<header>
+  <h1>CPG-RL 3D 시뮬 — 방향 변수 φ 와 다리당 모터 3개</h1>
+  <p>마우스로 드래그하면 돌려볼 수 있습니다. <b class="k">방향 φ</b> 슬라이더를 돌리면 발 궤적과 진행 방향(노란 화살표)이 수평면에서 회전 — 이게 이 논문이 추가한 전방향(omnidirectional) 변수입니다.</p>
+</header>
+
+<div class="wrap">
+  <div class="stage">
+    <canvas id="cv" width="820" height="520"></canvas>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--fr)"></span>FR</span>
+      <span><span class="dot" style="background:var(--fl)"></span>FL</span>
+      <span><span class="dot" style="background:var(--hr)"></span>HR</span>
+      <span><span class="dot" style="background:var(--hl)"></span>HL</span>
+      <span>· 관절3개: <span class="dot" style="background:#ff9f43"></span>외전 <span class="dot" style="background:#ffd27f"></span>굴곡 <span class="dot" style="background:#c9d1d9"></span>무릎</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="btns">
+      <button id="playBtn">⏸ 일시정지</button>
+      <button id="resetBtn">↺ 리셋</button>
+    </div>
+
+    <h2>방향 변수 (이 논문이 추가)</h2>
+    <div class="row"><label>방향 φ (heading) <span class="val" id="vPhi"></span></label>
+      <input type="range" id="phi" min="-180" max="180" step="5" value="0"></div>
+
+    <h2>손잡이 (RL이 조절)</h2>
+    <div class="row"><label>주파수 ω <span class="val" id="vFreq"></span></label>
+      <input type="range" id="freq" min="0.2" max="3.0" step="0.05" value="1.0"></div>
+    <div class="row"><label>진폭/보폭 μ <span class="val" id="vMu"></span></label>
+      <input type="range" id="mu" min="1.0" max="2.0" step="0.01" value="1.7"></div>
+
+    <h2>설계 파라미터</h2>
+    <div class="row"><label>몸 높이 h <span class="val" id="vH"></span></label>
+      <input type="range" id="h" min="0.18" max="0.36" step="0.005" value="0.30"></div>
+
+    <div class="tip">
+      <b class="k">φ=0°</b> 직진 · <b class="k">±90°</b> 옆걸음 · <b class="k">180°</b> 후진.
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================================================================
+//  CPG 진동자 (식 3,4,5) + 발끝 3D 매핑 (식 6,7,8) — 2D 버전과 동일
+// ===================================================================
+const A = 150.0;
+const L1 = 0.20, L2 = 0.20;          // 허벅지 / 정강이 [m]
+const Lb = 0.40, Wb = 0.18;          // 몸통 길이 / 너비 [m]
+const dstep = 0.16, gc = 0.07, gp = 0.02;
+
+const LEGS = ['FR','FL','HR','HL'];
+const COLOR = {FR:'#ff7b72', FL:'#79c0ff', HR:'#56d364', HL:'#e3b341'};
+// 몸통 기준 hip 위치 (x=앞+, y=좌+, z=위+).  오른쪽 다리는 y<0
+const HIP = {
+  FR:[ Lb/2, -Wb/2, 0], FL:[ Lb/2,  Wb/2, 0],
+  HR:[-Lb/2, -Wb/2, 0], HL:[-Lb/2,  Wb/2, 0],
+};
+const PHASE = {FR:0.0, FL:0.5, HR:0.5, HL:0.0};   // trot (대각쌍 동시)
+
+const P = { freq:1.0, mu:1.7, phi:0, h:0.30 };
+
+let osc = {};
+function initOsc(){
+  osc = {};
+  for(const k of LEGS) osc[k] = { r:P.mu, rdot:0, theta:2*Math.PI*PHASE[k] };
+  trail = [];
+}
+function stepOsc(o, dt){
+  const rddot = A*((A/4)*(P.mu - o.r) - o.rdot);
+  o.rdot += rddot*dt; o.r += o.rdot*dt;
+  o.theta += 2*Math.PI*P.freq*dt;
+}
+// hip 기준 발끝 3D (식 6,7,8). 방향 φ 가 좌우(y) 성분을 만든다.
+function footPos(o){
+  const c = Math.cos(o.theta), s = Math.sin(o.theta);
+  const rad = -dstep*(o.r-1)*c;
+  const fx = rad*Math.cos(P.phi);                 // 식6 앞뒤
+  const fy = rad*Math.sin(P.phi);                 // 식7 좌우  ← φ로 생김
+  const fz = -P.h + (s>0?gc:gp)*s;                // 식8 상하
+  return {fx, fy, fz, swing:s>0};
+}
+
+// ===================================================================
+//  3-DOF 역기구학 (hip 오프셋 포함): hip기준 발끝(fx,fy,fz)
+//   -> 외전관절 A(=hip) → 짧은 고관절 링크 → 굴곡관절 F → 무릎 K → 발
+//  관절 3개: ①외전(A) ②굴곡(F) ③무릎(K) 가 모두 보이게 한다.
+// ===================================================================
+const DHIP = 0.07;                          // 짧은 고관절 링크 길이 [m]
+function ik3(name, fx, fy, fz){
+  const s = (name==='FR'||name==='HR') ? -1 : +1;   // 오른쪽 다리는 바깥(-y)
+  const base = Math.hypot(fy, fz);                  // 항상 > DHIP (fz≈-h)
+  let c = (s*DHIP)/base; c = Math.max(-1, Math.min(1, c));
+  const alpha = Math.atan2(fz, fy) + Math.acos(c);  // 외전각
+  const q = Math.sin(alpha)*fy - Math.cos(alpha)*fz; // 다리 평면 내 아래거리
+  // 굴곡관절 F = A + Rx(α)·(0, s·DHIP, 0)
+  const F = [0, s*DHIP*Math.cos(alpha), s*DHIP*Math.sin(alpha)];
+  const dwn = [0, Math.sin(alpha), -Math.cos(alpha)]; // 평면 내 아래축
+  // F에서 발끝까지 2-링크(허벅지 L1 + 정강이 L2): 평면좌표 (앞=fx, 아래=q)
+  let D = Math.hypot(fx, q);
+  D = Math.min(D, (L1+L2)*0.999); D = Math.max(D, Math.abs(L1-L2)+1e-4);
+  const ang = Math.atan2(fx, q);
+  let cb = (D*D + L1*L1 - L2*L2)/(2*L1*D); cb = Math.max(-1, Math.min(1, cb));
+  const thigh = ang - Math.acos(cb);                // 무릎 뒤로
+  const kf = L1*Math.sin(thigh), kd = L1*Math.cos(thigh);
+  const K = [F[0]+kf, F[1]+kd*dwn[1], F[2]+kd*dwn[2]];
+  return { F, K, alpha };
+}
+
+// ===================================================================
+//  카메라(궤도) + 3D->2D 투영 (정사영 turntable)
+// ===================================================================
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W = cv.width, H = cv.height;
+let yaw = 0.6, pitch = 0.35, SCALE = 600;
+let cx = W*0.5, cy = H*0.52;
+// 캔버스 백버퍼를 실제 표시 크기에 맞춤 → object-fit 레터박스(검은 여백) 없이 꽉 참
+function fitCanvas(){
+  const w=Math.max(1,Math.round(cv.clientWidth||W));
+  const h=Math.max(1,Math.round(cv.clientHeight||H));
+  if(cv.width!==w) cv.width=w;
+  if(cv.height!==h) cv.height=h;
+  W=cv.width; H=cv.height; cx=W*0.5; cy=H*0.52; SCALE=H*1.15;
+}
+
+function project(p){
+  // yaw (z축 회전)
+  const x1 = p[0]*Math.cos(yaw) - p[1]*Math.sin(yaw);
+  const y1 = p[0]*Math.sin(yaw) + p[1]*Math.cos(yaw);
+  const z1 = p[2];
+  // pitch (화면 가로축 회전)
+  const y2 = y1*Math.cos(pitch) - z1*Math.sin(pitch);
+  const z2 = y1*Math.sin(pitch) + z1*Math.cos(pitch);
+  const sx = cx + x1*SCALE;
+  const sy = cy - z2*SCALE;
+  return [sx, sy, y2];   // y2 = 깊이 (클수록 앞)
+}
+function line3(a, b, color, w){
+  const A2 = project(a), B2 = project(b);
+  ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(A2[0],A2[1]); ctx.lineTo(B2[0],B2[1]); ctx.stroke();
+}
+function dot3(p, r, color){
+  const P2 = project(p);
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(P2[0],P2[1],r,0,7); ctx.fill();
+}
+
+// ===================================================================
+//  씬 구성요소
+// ===================================================================
+let trail = [];
+
+function drawGrid(){
+  const z = -P.h, n = 6, step = 0.18;
+  ctx.lineWidth = 1;
+  for(let i=-n;i<=n;i++){
+    ctx.strokeStyle = (i===0)?'#2a3340':'#1a2230';
+    line3([i*step, -n*step, z],[i*step, n*step, z], ctx.strokeStyle, 1);
+    line3([-n*step, i*step, z],[ n*step, i*step, z], ctx.strokeStyle, 1);
+  }
+}
+
+// 진행 방향 화살표 (φ 방향, 지면 위)
+function drawHeadingArrow(){
+  const z = -P.h + 0.002, len = 0.42;
+  const ex = Math.cos(P.phi)*len, ey = Math.sin(P.phi)*len;
+  line3([0,0,z],[ex,ey,z], '#ffd27f', 4);
+  // 화살촉
+  const back = 0.07, wing = 0.05;
+  const bx = ex - Math.cos(P.phi)*back, by = ey - Math.sin(P.phi)*back;
+  const px = -Math.sin(P.phi), py = Math.cos(P.phi);
+  line3([ex,ey,z],[bx+px*wing, by+py*wing, z], '#ffd27f', 4);
+  line3([ex,ey,z],[bx-px*wing, by-py*wing, z], '#ffd27f', 4);
+  const lab = project([ex,ey,z]);
+  ctx.fillStyle='#ffd27f'; ctx.font='12px "Malgun Gothic",sans-serif';
+  ctx.fillText('진행방향 φ', lab[0]+6, lab[1]);
+}
+
+function drawBody(){
+  const t = 0.05;                       // 몸통 두께(반)
+  const xs = Lb/2+0.03, ys = Wb/2;
+  const c = [
+    [ xs,-ys, t],[ xs,ys, t],[-xs,ys, t],[-xs,-ys, t],   // top 0-3
+    [ xs,-ys,-t],[ xs,ys,-t],[-xs,ys,-t],[-xs,-ys,-t],   // bot 4-7
+  ];
+  // 윗면 채우기
+  const top = [0,1,2,3].map(i=>project(c[i]));
+  ctx.fillStyle='rgba(70,80,95,0.55)';
+  ctx.beginPath(); ctx.moveTo(top[0][0],top[0][1]);
+  for(let i=1;i<4;i++) ctx.lineTo(top[i][0],top[i][1]); ctx.closePath(); ctx.fill();
+  // 모서리
+  const E=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  for(const [i,j] of E) line3(c[i],c[j],'#5a6573',2);
+  // 머리(앞=+x)
+  dot3([xs+0.03,0,t*0.4], 7, '#3b424b');
+}
+
+function drawLeg(name){
+  const hip = HIP[name];
+  const o = osc[name];
+  const f = footPos(o);
+  const ik = ik3(name, f.fx, f.fy, f.fz);
+  const A = hip;                                              // ①외전 관절
+  const F = [hip[0]+ik.F[0], hip[1]+ik.F[1], hip[2]+ik.F[2]]; // ②굴곡 관절
+  const K = [hip[0]+ik.K[0], hip[1]+ik.K[1], hip[2]+ik.K[2]]; // ③무릎 관절
+  const foot = [hip[0]+f.fx, hip[1]+f.fy, hip[2]+f.fz];
+  // 링크 3개
+  line3(A, F, COLOR[name], 8);          // 짧은 고관절 링크 (외전축)
+  line3(F, K, COLOR[name], 6);          // 허벅지
+  line3(K, foot, COLOR[name], 6);       // 정강이
+  // 관절 3개 표시
+  dot3(A, 6, '#ff9f43');                // ① 외전 (주황)
+  dot3(F, 5.5, '#ffd27f');              // ② 굴곡 (금색)
+  dot3(K, 5, '#c9d1d9');                // ③ 무릎 (회색)
+  dot3(foot, 5, f.swing?COLOR[name]:'#c9d1d9');
+  if(name==='FR'){ trail.push(foot); if(trail.length>200) trail.shift(); }
+}
+
+function drawTrail(){
+  if(trail.length<2) return;
+  ctx.strokeStyle='rgba(255,123,114,0.55)'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  const p0=project(trail[0]); ctx.moveTo(p0[0],p0[1]);
+  for(const p of trail){ const q=project(p); ctx.lineTo(q[0],q[1]); }
+  ctx.stroke();
+}
+
+function drawHUD(){
+  const o=osc['FR'];
+  const th=((o.theta%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+  const f=footPos(o);
+  const lines=[
+    `φ=${(P.phi*180/Math.PI).toFixed(0)}°  μ=${P.mu.toFixed(2)}  ω=${P.freq.toFixed(2)}Hz`,
+    `FR: r=${o.r.toFixed(2)} θ=${(th*180/Math.PI).toFixed(0)}°  (${f.swing?'스윙':'디딤'})`,
+    `발끝: x=${f.fx.toFixed(3)} y=${f.fy.toFixed(3)} z=${f.fz.toFixed(3)}`,
+  ];
+  ctx.font='12px "Malgun Gothic",monospace';
+  let wmax=0; for(const s of lines) wmax=Math.max(wmax,ctx.measureText(s).width);
+  ctx.fillStyle='rgba(8,11,16,0.7)';
+  ctx.fillRect(12,12,wmax+18,lines.length*17+12);
+  ctx.fillStyle='#ffd27f';
+  for(let i=0;i<lines.length;i++) ctx.fillText(lines[i],20,32+i*17);
+}
+
+function render(){
+  fitCanvas();
+  ctx.clearRect(0,0,W,H);
+  drawGrid();
+  drawHeadingArrow();
+  drawTrail();
+  drawBody();
+  // 깊이순(뒤->앞)으로 다리 정렬해 그림
+  const order = LEGS.slice().sort((a,b)=>{
+    const fa=footPos(osc[a]), fb=footPos(osc[b]);
+    const da=project([HIP[a][0]+fa.fx,HIP[a][1]+fa.fy,HIP[a][2]+fa.fz])[2];
+    const db=project([HIP[b][0]+fb.fx,HIP[b][1]+fb.fy,HIP[b][2]+fb.fz])[2];
+    return da-db;
+  });
+  for(const k of order) drawLeg(k);
+  drawHUD();
+}
+
+// ===================================================================
+//  루프 / 입력
+// ===================================================================
+let running=true, last=null;
+function loop(ts){
+  if(last===null) last=ts;
+  let dt=(ts-last)/1000; last=ts; dt=Math.min(dt,0.05);
+  if(running){ const sub=8; for(let i=0;i<sub;i++) for(const k of LEGS) stepOsc(osc[k],dt/sub); }
+  render();
+  requestAnimationFrame(loop);
+}
+
+// 마우스 드래그로 궤도 회전
+let drag=false, lx=0, ly=0;
+cv.addEventListener('mousedown', e=>{drag=true; lx=e.offsetX; ly=e.offsetY;});
+window.addEventListener('mouseup', ()=>drag=false);
+window.addEventListener('mousemove', e=>{
+  if(!drag) return;
+  const r=cv.getBoundingClientRect();
+  const x=e.clientX-r.left, y=e.clientY-r.top;
+  yaw += (x-lx)*0.01; pitch += (y-ly)*0.01;
+  pitch = Math.max(-0.2, Math.min(1.4, pitch));
+  lx=x; ly=y;
+});
+
+function bind(id,key,fmt,toRad){
+  const el=document.getElementById(id), out=document.getElementById('v'+id.charAt(0).toUpperCase()+id.slice(1));
+  const upd=()=>{ let v=parseFloat(el.value); P[key]=toRad?v*Math.PI/180:v; out.textContent=fmt(v); };
+  el.addEventListener('input',upd); upd();
+}
+bind('phi','phi', v=>v.toFixed(0)+'°', true);
+bind('freq','freq', v=>v.toFixed(2)+' Hz');
+bind('mu','mu', v=>v.toFixed(2));
+bind('h','h', v=>v.toFixed(3)+' m');
+
+const DEF={phi:'0', freq:'1.0', mu:'1.7', h:'0.30'};
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  for(const id in DEF){ const el=document.getElementById(id); el.value=DEF[id]; el.dispatchEvent(new Event('input')); }
+  yaw=0.6; pitch=0.35; initOsc();
+});
+document.getElementById('playBtn').addEventListener('click',e=>{
+  running=!running; e.target.textContent= running?'⏸ 일시정지':'▶ 재생';
+});
+
+initOsc();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

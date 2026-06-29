@@ -1,0 +1,7 @@
+# 검증용 임시 파일 (headless Chrome 스크린샷 등)
+_*.html
+_*.png
+
+# OS
+Thumbs.db
+.DS_Store
